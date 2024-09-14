@@ -1,13 +1,12 @@
 package main
 
 import (
+	"cache/cacher"
 	"fmt"
-
-	"./cache"
 )
 
 func main() {
-	cache := cache.New()
+	cache := cacher.New()
 
 	cache.Set("userId", 42)
 	userId := cache.Get("userId")
