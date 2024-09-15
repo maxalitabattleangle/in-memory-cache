@@ -1,9 +1,14 @@
 package cacher
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+	"time"
+)
 
 type Cache struct {
 	memory map[string]interface{}
+	mu     sync.RWMutex
 }
 
 func New() Cache {
@@ -12,34 +17,33 @@ func New() Cache {
 	}
 }
 
-func (c *Cache) Set(key string, value interface{}) {
+func (c *Cache) Set(key string, value interface{}, ttl time.Duration) {
+	c.mu.Lock()
 	c.memory[key] = value
+	c.mu.Unlock()
+
+	go func(key string, ttl time.Duration) {
+		time.Sleep(ttl)
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if _, ok := c.memory[key]; ok {
+			c.delete(key)
+		}
+	}(key, ttl)
 }
 
-func (c Cache) Get(key string) interface{} {
-	val, ok := c.find(key)
+func (c *Cache) Get(key string) (interface{}, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 
-	if !ok {
-		fmt.Printf("Элемент по ключу %s не найден.\n", key)
-	}
-
-	return val
-}
-
-func (c *Cache) Delete(key string) {
-	if _, ok := c.find(key); ok {
-		delete(c.memory, key)
-	} else {
-		fmt.Printf("Элемент по ключу %s не найден.\n", key)
-	}
-}
-
-func (c *Cache) find(key string) (val interface{}, b bool) {
 	val, ok := c.memory[key]
-
-	if ok {
-		b = true
+	if !ok {
+		return nil, fmt.Errorf("not found")
 	}
 
-	return val, b
+	return val, nil
+}
+
+func (c *Cache) delete(key string) {
+	delete(c.memory, key)
 }
